@@ -1,6 +1,6 @@
 ---
 name: print-bw
-description: "Send a black-and-white (monochrome) print job to the HP DeskJet 5200. Saves color ink by forcing grayscale output. Use when the user wants to print in B&W, grayscale, or monochrome."
+description: "Send a black-and-white print job to the HP DeskJet 5200. Accepts a file path, free-form content, or a named template (session-summary, blocker, note-to-self). Saves color ink by forcing monochrome."
 ---
 
 # Print (Black & White)
@@ -9,44 +9,71 @@ Send a monochrome print job to the HP DeskJet 5200. Forces grayscale to conserve
 
 ## Read Printer Config
 
-Read `context/printer-config.md` for the CUPS printer name and IP.
+Read `context/printer-config.md` (in this plugin's directory) for the CUPS printer name and IP.
+
+## Locate Plugin Directory
+
+This skill may be invoked from any repository. To find the templates and config, locate the plugin's installed path:
+
+```bash
+PLUGIN_DIR=$(find ~/.claude/plugins/cache/danielrosehill/hp5200-printer -maxdepth 1 -type d | sort -V | tail -1)
+```
 
 ## Input Handling
 
-### If the user provides a file path
-Print it directly — skip Typst compilation for PDF, image, or text files.
+### 1. User provides a file path
+Print it directly — no Typst compilation needed for PDF, image, or text files.
 
-### If the user provides content/instructions
-1. Create a Typst document under `/tmp/hp5200-print/`:
-   ```typst
-   #set page(paper: "a4", margin: 2.5cm)
-   #set text(font: "IBM Plex Sans", size: 11pt)
-   #set par(justify: true, leading: 0.65em)
+### 2. User provides content or instructions
+Create a Typst document from scratch under `/tmp/hp5200-print/`.
 
-   // Content here
-   ```
-2. Compile: `typst compile /tmp/hp5200-print/doc.typ /tmp/hp5200-print/doc.pdf`
-3. Verify: `pdftotext /tmp/hp5200-print/doc.pdf - | head -40`
-4. Show the user the extracted text and ask for approval.
+### 3. User requests a template
+Use one of the templates from `$PLUGIN_DIR/templates/`. Available templates:
 
-## Print Command
+| Template | File | Use case |
+|---|---|---|
+| Session Summary | `session-summary.typ` | End-of-session recap |
+| Blocker | `blocker.typ` | Document a blocker for human attention |
+| Note To Self | `note-to-self.typ` | Quick printed reminder or thought |
+
+#### Template variable injection
+
+All templates use `«VARIABLE»` placeholders. Before compiling, replace them:
+
+| Variable | Value |
+|---|---|
+| `«AGENT_NAME»` | The AI agent's name (e.g. "Claude Code") |
+| `«MODEL_NAME»` | The model (e.g. "Opus 4.6") — use whatever model you actually are |
+| `«DATE»` | Current date/time formatted as "13 April 2026, 15:30" |
+| `«TITLE»` | Document title — ask the user or infer from context |
+| `«BODY»` | The main content — from user input or generated |
+
+Write the file directly with variables already substituted (preferred over sed for escaping safety).
+
+## Compile and Print
 
 ```bash
-lp -d HP-DeskJet-5200 -o print-color-mode=monochrome FILE_PATH
+mkdir -p /tmp/hp5200-print
+typst compile /tmp/hp5200-print/doc.typ /tmp/hp5200-print/doc.pdf
+pdftotext /tmp/hp5200-print/doc.pdf - | head -40
 ```
 
-This forces the printer to use only the black cartridge, which is useful when:
-- Tri-color ink is low (check with `/check-ink`)
-- The document doesn't need color
-- The user wants to save color ink
+Show the user the extracted text and ask for approval, then:
 
-Common options the user may request:
+```bash
+lp -d HP-DeskJet-5200 -o print-color-mode=monochrome /tmp/hp5200-print/doc.pdf
+```
+
+This forces the printer to use only the black cartridge, saving color ink.
+
+Common options:
 - Multiple copies: `-n 3`
 - Duplex: `-o sides=two-sided-long-edge`
 - Landscape: `-o landscape`
 
 ## Hard Rules
 
-- **Always ask for approval** before sending to printer (show content preview first).
+- **Always ask for approval** before sending to printer (show content preview first). Exception: test-print skill.
 - **Always use A4** unless the user specifies otherwise.
-- For Typst documents, always compile and verify before printing.
+- **Always compile and verify** before printing — never send a `.typ` file directly.
+- If the user provides a pre-existing file (PDF, image, text), skip Typst and print directly.
