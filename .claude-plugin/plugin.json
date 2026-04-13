@@ -1,0 +1,12 @@
+{
+  "name": "Claude-HP5200-Skill",
+  "version": "1.0.0",
+  "description": "HP DeskJet 5200 printer and scanner operations — ink levels, color/B&W printing, scanning, and auto-discovery",
+  "author": {
+    "name": "Daniel Rosehill",
+    "url": "https://github.com/danielrosehill"
+  },
+  "repository": "https://github.com/danielrosehill/Claude-HP5200-Skill-plugin",
+  "license": "MIT",
+  "keywords": ["printer", "scanner", "hp", "cups", "ipp", "hardware"]
+}
